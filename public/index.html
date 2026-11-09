@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>downer — paste a link, get the file</title>
+<meta name="description" content="Minimal media downloader. Paste a link from YouTube, SoundCloud, TikTok and more." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23111'/%3E%3Cpath d='M12 5v9m0 0-4-4m4 4 4-4M5 19h14' stroke='white' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f6f8;
+    --surface-2: #eceef2;
+    --border: #e3e5ea;
+    --border-soft: #eceef2;
+    --accent: #111111;
+    --accent-hover: #000000;
+    --accent-soft: rgba(0, 0, 0, 0.06);
+    --text: #0c0d12;
+    --muted: #5d6472;
+    --dim: #9aa0ae;
+    --ok: #1a9e6b;
+    --err: #d64550;
+    --radius: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { color-scheme: light; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    padding: 20px 28px 0;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .brand-name {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  /* ---------- main ---------- */
+  main {
+    flex: 1;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 20px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hero {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 6px;
+  }
+
+  /* ---------- omnibox ---------- */
+  .omnibox {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .omnibox:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+  }
+
+  .omnibox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 4px 4px 14px;
+  }
+
+  .omnibox-icon { color: var(--dim); flex-shrink: 0; }
+
+  .omnibox-input {
+    flex: 1;
+    min-width: 0;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 0.98rem;
+    padding: 10px 0;
+  }
+  .omnibox-input::placeholder { color: var(--dim); }
+
+  .paste-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .paste-btn:hover { color: var(--text); border-color: var(--border); }
+
+  .go-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.15s;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+  .go-btn:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+  .go-btn:active:not(:disabled) { transform: scale(0.96); }
+  .go-btn:disabled { opacity: 0.6; cursor: default; }
+
+  /* ---------- options ---------- */
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    margin-top: 12px;
+    padding: 0 6px;
+  }
+
+  .segmented {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 11px;
+    padding: 3px;
+  }
+
+  .seg-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .seg-btn.active {
+    background: var(--surface-2);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+
+  .formats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .fmt-btn {
+    background: none;
+    border: 1px solid var(--border-soft);
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 11px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .fmt-btn:hover { color: var(--muted); border-color: var(--border); }
+  .fmt-btn.active {
+    color: var(--text);
+    border-color: rgba(0, 0, 0, 0.45);
+    background: var(--surface-2);
+  }
+
+  /* ---------- inspect card ---------- */
+  .inspect {
+    width: 100%;
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: rise 0.25s ease;
+  }
+
+  .inspect-thumb {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: var(--surface-2);
+    flex-shrink: 0;
+  }
+
+  .inspect-title {
+    font-size: 0.92rem;
+    font-weight: 650;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 5px;
+  }
+
+  .inspect-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+
+  .platform-pill {
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  /* ---------- toast ---------- */
+  .toasts {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+    align-items: center;
+  }
+
+  .toast {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 10px 18px;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    animation: rise 0.2s ease;
+  }
+  .toast.err { border-color: rgba(214, 69, 80, 0.4); color: var(--err); }
+  .toast.ok { border-color: rgba(26, 158, 107, 0.4); color: var(--ok); }
+
+  .spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(255,255,255,0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand-name">downer</span>
+</header>
+
+<main>
+  
+
+  <div class="omnibox">
+    <div class="omnibox-row">
+      <svg class="omnibox-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      <input
+        id="url-input"
+        class="omnibox-input"
+        type="text"
+        placeholder="Paste a YouTube, SoundCloud, TikTok or file link…"
+        autocomplete="off"
+        spellcheck="false"
+        autofocus
+        oninput="onInput(this.value)"
+        onkeydown="if(event.key==='Enter') startDownload()"
+      />
+      <button class="paste-btn" onclick="pasteFromClipboard()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Paste
+      </button>
+      <button class="go-btn" id="go-btn" onclick="startDownload()" title="Download">
+        <svg id="go-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="20" x2="19" y2="20"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="options">
+    <div class="segmented" id="mode-seg">
+      <button class="seg-btn active" data-mode="audio">Audio</button>
+      <button class="seg-btn" data-mode="video">Video</button>
+      <button class="seg-btn" data-mode="file">File</button>
+    </div>
+    <div class="formats" id="format-row"></div>
+  </div>
+
+  <div id="inspect-slot" style="width:100%"></div>
+</main>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+  const FORMATS = {
+    audio: ["mp3", "wav", "flac", "m4a"],
+    video: ["mp4_best", "mp4_1080", "mp4_720"],
+    file:  ["raw"],
+  };
+  const FORMAT_LABELS = {
+    mp3: "MP3", wav: "WAV", flac: "FLAC", m4a: "M4A",
+    mp4_best: "Best", mp4_1080: "1080p", mp4_720: "720p", raw: "Original",
+  };
+
+  let mode = "audio";
+  let format = "mp3";
+  let inspected = null;
+  let inspectTimer = null;
+
+  const $ = id => document.getElementById(id);
+
+  function renderFormats() {
+    $("format-row").innerHTML = FORMATS[mode].map(f =>
+      `<button class="fmt-btn ${f === format ? "active" : ""}" onclick="setFormat('${f}')">${FORMAT_LABELS[f]}</button>`
+    ).join("");
+  }
+
+  function setMode(m) {
+    mode = m;
+    format = FORMATS[m][0];
+    document.querySelectorAll("#mode-seg .seg-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.mode === m)
+    );
+    renderFormats();
+  }
+
+  function setFormat(f) { format = f; renderFormats(); }
+
+  document.querySelectorAll("#mode-seg .seg-btn").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.mode))
+  );
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim().startsWith("http")) {
+        $("url-input").value = text.trim();
+        onInput(text.trim());
+        toast("Link pasted", "ok");
+      } else {
+        toast("Clipboard has no link", "err");
+      }
+    } catch {
+      toast("Press Ctrl+V to paste", "err");
+    }
+  }
+
+  function onInput(val) {
+    clearTimeout(inspectTimer);
+    const url = val.trim();
+    if (!/^https?:\/\//.test(url)) { $("inspect-slot").innerHTML = ""; inspected = null; return; }
+    inspectTimer = setTimeout(() => inspect(url), 400);
+  }
+
+  async function inspect(url) {
+    try {
+      const res = await fetch("/api/inspect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      inspected = data;
+      const thumb = data.thumbnail ||
+        "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='56' height='56' fill='%23eceef2'/%3E%3C/svg%3E";
+      $("inspect-slot").innerHTML = `
+        <div class="inspect">
+          <img class="inspect-thumb" src="${thumb}" alt="" onerror="this.style.opacity=.25" />
+          <div style="min-width:0;flex:1">
+            <div class="inspect-title">${esc(data.title)}</div>
+            <div class="inspect-meta">
+              <span class="platform-pill">${esc(data.platform || "Web")}</span>
+              ${data.uploader ? `<span>${esc(data.uploader)}</span>` : ""}
+              ${data.duration_formatted ? `<span>· ${esc(data.duration_formatted)}</span>` : ""}
+            </div>
+          </div>
+        </div>`;
+    } catch { /* ignore */ }
+  }
+
+  function setBusy(busy) {
+    $("go-btn").disabled = busy;
+    $("go-icon").outerHTML = busy
+      ? '<div class="spinner" id="go-icon"></div>'
+      : '<svg id="go-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="20" x2="19" y2="20"/></svg>';
+  }
+
+  async function startDownload() {
+    const url = $("url-input").value.trim();
+    if (!url) { toast("Paste a link first", "err"); return; }
+
+    setBusy(true);
+    toast(mode === "audio" ? "Converting audio…" : "Preparing download…", "ok");
+
+    try {
+      const res = await fetch("/api/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          mode,
+          format,
+          title: inspected ? inspected.title : null,
+        }),
+      });
+
+      const ctype = res.headers.get("content-type") || "";
+
+      if (res.ok && ctype.includes("application/json")) {
+        const data = await res.json();
+        if (data.download_url) {
+          const a = document.createElement("a");
+          a.href = data.download_url;
+          a.download = data.filename || "";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          toast("Download started", "ok");
+        }
+      } else if (res.ok) {
+        const blob = await res.blob();
+        const dispo = res.headers.get("content-disposition") || "";
+        const match = dispo.match(/filename="?([^";]+)"?/);
+        saveBlob(blob, match ? match[1] : `${(inspected && inspected.title) || "download"}.${format === "raw" ? "" : format.split("_")[0]}`);
+        toast("Saved to your downloads", "ok");
+      } else {
+        let msg = "Download failed";
+        try { msg = (await res.json()).detail || msg; } catch {}
+        toast(String(msg).slice(0, 140), "err");
+      }
+    } catch (e) {
+      toast("Network error — try again", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function saveBlob(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  function toast(msg, type = "") {
+    const t = document.createElement("div");
+    t.className = "toast " + type;
+    t.textContent = msg;
+    $("toasts").appendChild(t);
+    setTimeout(() => { t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(() => t.remove(), 320); }, 3200);
+  }
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  renderFormats();
+</script>
+</body>
+</html>
