@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+downloads/
+*.wav
+*.mp3
+*.mp4
+*.flac
+*.m4a
+.venv/
+env/
+.env
+.DS_Store
+make_commits.py
