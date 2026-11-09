@@ -1,56 +1,40 @@
 import os
-import sys
 import re
-import json
-import time
 import urllib.request
 import urllib.parse
-import subprocess
-import threading
-from typing import List, Optional
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+import tempfile
+
 import yt_dlp
 import imageio_ffmpeg
+from typing import Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
-app = FastAPI(title="Cobalt-Inspired Universal Downloader")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-DOWNLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "downloads"))
-os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
-os.makedirs(STATIC_DIR, exist_ok=True)
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_HTML = os.path.join(BASE_DIR, "public", "index.html")
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
-queue_lock = threading.Lock()
-download_queue = []
-worker_running = False
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+app = FastAPI(title="downer", docs_url=None, redoc_url=None, openapi_url=None)
+
 
 class InspectRequest(BaseModel):
     url: str
 
+
 class DownloadRequest(BaseModel):
     url: str
-    mode: Optional[str] = "audio"     # "audio" | "video" | "raw"
-    format: Optional[str] = "mp3"    # "mp3" | "wav" | "flac" | "m4a" | "mp4_best" | "mp4_1080" | "mp4_720" | "raw"
-    title: Optional[str] = None
-    thumbnail: Optional[str] = None
+    mode: Optional[str] = "audio"      # "audio" | "video" | "file"
+    format: Optional[str] = "mp3"      # "mp3" | "wav" | "flac" | "m4a" | "mp4_best" | "mp4_1080" | "mp4_720" | "raw"
+
 
 def sanitize_filename(filename: str) -> str:
     cleaned = re.sub(r'[\\/*?:"<>|]', '', filename)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned[:100] if cleaned else "download"
+
 
 def format_duration(seconds: Optional[float]) -> str:
     if not seconds:
@@ -61,6 +45,7 @@ def format_duration(seconds: Optional[float]) -> str:
     if h > 0:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m}:{s:02d}"
+
 
 def detect_platform(url: str) -> str:
     u = url.lower()
@@ -84,6 +69,26 @@ def detect_platform(url: str) -> str:
         return "Bilibili"
     return "Direct / Web"
 
+
+def ydl_base_opts(**extra):
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 20,
+        "retries": 8,
+        "http_headers": {"User-Agent": UA},
+    }
+    opts.update(extra)
+    return opts
+
+
+@app.get("/")
+def index():
+    if os.path.exists(INDEX_HTML):
+        return FileResponse(INDEX_HTML, media_type="text/html")
+    raise HTTPException(status_code=404, detail="UI not found")
+
+
 @app.post("/api/inspect")
 def inspect_url(req: InspectRequest):
     url = req.url.strip()
@@ -92,68 +97,63 @@ def inspect_url(req: InspectRequest):
 
     platform = detect_platform(url)
 
-    # Fast probe with yt-dlp
-    ydl_opts = {
-        'extract_flat': False,
-        'quiet': True,
-        'no_warnings': True,
-        'socket_timeout': 10,
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-        }
-    }
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_base_opts()) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            # If playlist / multi-item
-            if 'entries' in info and info['entries']:
-                first = info['entries'][0] or {}
-                title = f"{info.get('title', 'Playlist')} ({len(info['entries'])} items)"
-                uploader = info.get('uploader') or first.get('uploader') or ""
-                thumbnail = info.get('thumbnail') or first.get('thumbnail') or ""
-                duration = info.get('duration') or first.get('duration') or 0
-            else:
-                title = info.get('title') or "Media Track"
-                uploader = info.get('uploader') or info.get('artist') or info.get('channel') or ""
-                thumbnail = info.get('thumbnail') or ""
-                duration = info.get('duration') or 0
 
-            return {
-                "url": url,
-                "title": title,
-                "uploader": uploader,
-                "platform": platform,
-                "duration": duration,
-                "duration_formatted": format_duration(duration),
-                "thumbnail": thumbnail,
-                "type": "media"
-            }
-    except Exception as e:
-        # Check if direct HTTP file link
+        if info.get("entries"):
+            first = info["entries"][0] or {}
+            title = f"{info.get('title', 'Playlist')} ({len(info['entries'])} items)"
+            uploader = info.get("uploader") or first.get("uploader") or ""
+            thumbnail = info.get("thumbnail") or first.get("thumbnail") or ""
+            duration = info.get("duration") or first.get("duration") or 0
+        else:
+            title = info.get("title") or "Media Track"
+            uploader = (
+                info.get("uploader")
+                or info.get("artist")
+                or info.get("channel")
+                or ""
+            )
+            thumbnail = info.get("thumbnail") or ""
+            duration = info.get("duration") or 0
+
+        return {
+            "url": url,
+            "title": title,
+            "uploader": uploader,
+            "platform": platform,
+            "duration": duration,
+            "duration_formatted": format_duration(duration),
+            "thumbnail": thumbnail,
+            "type": "media",
+        }
+    except Exception:
+        # Direct file or unsupported page — do a lightweight HEAD probe.
         try:
-            head_req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}, method='HEAD')
-            with urllib.request.urlopen(head_req, timeout=6) as resp:
-                content_type = resp.headers.get('Content-Type', '')
-                content_len = resp.headers.get('Content-Length')
-                size_mb = f"{int(content_len) / (1024*1024):.1f} MB" if content_len else "Unknown size"
+            head = urllib.request.Request(url, headers={"User-Agent": UA}, method="HEAD")
+            with urllib.request.urlopen(head, timeout=6) as resp:
+                content_len = resp.headers.get("Content-Length")
+                size_mb = (
+                    f"{int(content_len) / (1024 * 1024):.1f} MB"
+                    if content_len
+                    else "Unknown size"
+                )
                 parsed = urllib.parse.urlparse(url)
                 filename = os.path.basename(parsed.path) or "downloaded_file"
                 return {
                     "url": url,
                     "title": filename,
-                    "uploader": resp.headers.get('Server', platform),
+                    "uploader": resp.headers.get("Server", platform),
                     "platform": platform,
                     "duration": 0,
                     "duration_formatted": size_mb,
                     "thumbnail": "",
-                    "type": "direct_file"
+                    "type": "direct_file",
                 }
         except Exception:
             pass
 
-        # Return generic fallback preview
         parsed = urllib.parse.urlparse(url)
         return {
             "url": url,
@@ -163,260 +163,153 @@ def inspect_url(req: InspectRequest):
             "duration": 0,
             "duration_formatted": "",
             "thumbnail": "",
-            "type": "url"
+            "type": "url",
         }
 
-def download_worker():
-    global worker_running
-    while True:
-        target_item = None
-        with queue_lock:
-            for item in download_queue:
-                if item["status"] == "queued":
-                    target_item = item
-                    item["status"] = "downloading"
-                    item["progress"] = 5.0
-                    break
-            if not target_item:
-                worker_running = False
-                break
 
-        item_id = target_item["id"]
-        url = target_item["url"]
-        mode = target_item.get("mode", "audio")
-        fmt = target_item.get("format", "mp3")
+def is_direct_file(url: str) -> bool:
+    """True when the URL looks like a plain file rather than a media page."""
+    try:
+        head = urllib.request.Request(url, headers={"User-Agent": UA}, method="HEAD")
+        with urllib.request.urlopen(head, timeout=6) as resp:
+            ctype = (resp.headers.get("Content-Type") or "").lower()
+            if ctype and "text/html" not in ctype and "application/xhtml" not in ctype:
+                return True
+    except Exception:
+        pass
+    ext = os.path.splitext(urllib.parse.urlparse(url).path)[1].lower()
+    return ext in (
+        ".zip", ".rar", ".7z", ".tar", ".gz", ".pdf", ".iso",
+        ".exe", ".dmg", ".apk", ".mp3", ".mp4", ".wav", ".flac",
+    )
 
-        def progress_hook(d):
-            if d['status'] == 'downloading':
-                total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
-                downloaded = d.get('downloaded_bytes') or 0
-                pct = (downloaded / total * 100) if total > 0 else 0
-                speed = d.get('speed')
-                speed_str = f"{speed / 1024 / 1024:.1f} MB/s" if speed else ""
-                with queue_lock:
-                    for item in download_queue:
-                        if item["id"] == item_id:
-                            item["progress"] = round(min(max(pct, 5.0), 95.0), 1)
-                            item["speed"] = speed_str
-                            break
-            elif d['status'] == 'finished':
-                with queue_lock:
-                    for item in download_queue:
-                        if item["id"] == item_id:
-                            item["status"] = "processing"
-                            item["progress"] = 96.0
-                            break
-
-        try:
-            # Check if direct file stream (non-yt-dlp)
-            parsed = urllib.parse.urlparse(url)
-            file_ext = os.path.splitext(parsed.path)[1].lower()
-            
-            if mode == "raw" or (fmt == "raw" and file_ext in ('.zip', '.rar', '.7z', '.tar', '.gz', '.pdf', '.iso', '.exe', '.dmg', '.apk')):
-                # Direct streaming download
-                raw_filename = sanitize_filename(os.path.basename(parsed.path) or "downloaded_file")
-                out_path = os.path.join(DOWNLOADS_DIR, raw_filename)
-                
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=30) as resp, open(out_path, 'wb') as f:
-                    total_bytes = int(resp.headers.get('Content-Length') or 0)
-                    downloaded = 0
-                    chunk_size = 1024 * 128
-                    while True:
-                        chunk = resp.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_bytes:
-                            pct = round(downloaded / total_bytes * 100, 1)
-                            with queue_lock:
-                                for item in download_queue:
-                                    if item["id"] == item_id:
-                                        item["progress"] = pct
-                                        break
-                
-                with queue_lock:
-                    for item in download_queue:
-                        if item["id"] == item_id:
-                            item["status"] = "completed"
-                            item["progress"] = 100.0
-                            item["filename"] = raw_filename
-                            break
-                continue
-
-            # YT-DLP Setup for Media (Audio or Video)
-            out_tmpl = os.path.join(DOWNLOADS_DIR, '%(title).80s - %(uploader).40s.%(ext)s')
-
-            if mode == "video":
-                # Video modes
-                if fmt == "mp4_1080":
-                    v_format = "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best"
-                elif fmt == "mp4_720":
-                    v_format = "bestvideo[height<=720]+bestaudio/best[height<=720]/best"
-                else: # mp4_best
-                    v_format = "bestvideo+bestaudio/best"
-
-                ydl_opts = {
-                    'format': v_format,
-                    'outtmpl': out_tmpl,
-                    'merge_output_format': 'mp4',
-                    'ffmpeg_location': FFMPEG_PATH,
-                    'progress_hooks': [progress_hook],
-                    'socket_timeout': 30,
-                    'retries': 15,
-                    'windowsfilenames': True,
-                    'quiet': True,
-                    'no_warnings': True,
-                }
-            else:
-                # Audio modes (MP3 320k, WAV, FLAC, M4A)
-                target_codec = fmt if fmt in ('wav', 'flac', 'm4a') else 'mp3'
-                postprocessors = [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': target_codec,
-                }]
-                if target_codec == 'mp3':
-                    postprocessors[0]['preferredquality'] = '320'
-
-                ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'outtmpl': out_tmpl,
-                    'postprocessors': postprocessors,
-                    'ffmpeg_location': FFMPEG_PATH,
-                    'progress_hooks': [progress_hook],
-                    'socket_timeout': 30,
-                    'retries': 15,
-                    'windowsfilenames': True,
-                    'quiet': True,
-                    'no_warnings': True,
-                }
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                prepared = ydl.prepare_filename(info)
-                
-                # Determine final file name after postprocessing
-                base, _ = os.path.splitext(prepared)
-                if mode == "audio":
-                    ext = f".{target_codec}"
-                else:
-                    ext = ".mp4"
-                
-                final_filename = os.path.basename(base + ext)
-                if not os.path.exists(os.path.join(DOWNLOADS_DIR, final_filename)):
-                    # Check if original exists
-                    if os.path.exists(prepared):
-                        final_filename = os.path.basename(prepared)
-
-                with queue_lock:
-                    for item in download_queue:
-                        if item["id"] == item_id:
-                            item["title"] = info.get('title') or item["title"]
-                            item["uploader"] = info.get('uploader') or item.get("uploader", "")
-                            item["status"] = "completed"
-                            item["progress"] = 100.0
-                            item["filename"] = final_filename
-                            break
-
-        except Exception as e:
-            clean_err = re.sub(r'\x1b\[[0-9;]*m', '', str(e))
-            if "policy: snip" in clean_err.lower() or "go+" in clean_err.lower():
-                clean_err = "Track locked by subscription (Preview only)."
-            elif "timed out" in clean_err.lower():
-                clean_err = "Connection timed out. Please retry."
-            with queue_lock:
-                for item in download_queue:
-                    if item["id"] == item_id:
-                        item["status"] = "failed"
-                        item["error"] = clean_err[:120]
-                        break
 
 @app.post("/api/download")
-def start_download(req: DownloadRequest, bg_tasks: BackgroundTasks):
-    global worker_running
+def start_download(req: DownloadRequest):
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
 
-    item_id = f"dl_{int(time.time() * 1000)}_{abs(hash(url)) % 10000}"
-    item = {
-        "id": item_id,
-        "url": url,
-        "title": req.title or url,
-        "uploader": "",
-        "thumbnail": req.thumbnail or "",
-        "platform": detect_platform(url),
-        "mode": req.mode or "audio",
-        "format": req.format or "mp3",
-        "status": "queued",
-        "progress": 0.0,
-        "speed": "",
-        "filename": "",
-        "error": ""
-    }
+    mode = req.mode or "audio"
+    fmt = req.format or "mp3"
 
-    with queue_lock:
-        download_queue.insert(0, item)
-        if not worker_running:
-            worker_running = True
-            threading.Thread(target=download_worker, daemon=True).start()
+    # Plain files: hand the URL straight to the browser.
+    if mode == "file" or is_direct_file(url):
+        name = sanitize_filename(
+            os.path.basename(urllib.parse.urlparse(url).path) or "download"
+        )
+        return JSONResponse({"kind": "redirect", "download_url": url, "filename": name})
 
-    return {"status": "queued", "item": item}
+    # Audio: download + convert with yt-dlp/ffmpeg, return the file.
+    if mode == "audio":
+        return download_audio(url, fmt)
 
-@app.get("/api/queue")
-def get_queue():
-    with queue_lock:
-        return {"queue": list(download_queue)}
+    # Video: download + merge with yt-dlp/ffmpeg, return the file.
+    return download_video(url, fmt)
 
-@app.delete("/api/queue/{item_id}")
-def remove_queue_item(item_id: str):
-    with queue_lock:
-        for idx, item in enumerate(download_queue):
-            if item["id"] == item_id:
-                if item["status"] not in ("downloading", "processing"):
-                    download_queue.pop(idx)
-                    return {"deleted": True, "id": item_id}
-                else:
-                    item["status"] = "failed"
-                    item["error"] = "Cancelled"
-                    return {"cancelled": True, "id": item_id}
-    raise HTTPException(status_code=404, detail="Item not found")
 
-@app.post("/api/queue/clear-completed")
-def clear_completed():
-    with queue_lock:
-        to_keep = [it for it in download_queue if it["status"] in ("queued", "downloading", "processing")]
-        download_queue.clear()
-        download_queue.extend(to_keep)
-    return {"status": "ok"}
+def download_audio(url: str, fmt: str):
+    codec = fmt if fmt in ("wav", "flac", "m4a") else "mp3"
+    tmpdir = tempfile.mkdtemp(prefix="dl_")
+    outtmpl = os.path.join(tmpdir, "%(title).80s.%(ext)s")
 
-@app.post("/api/open-downloads-folder")
-def open_downloads_folder():
+    postprocessors = [{"key": "FFmpegExtractAudio", "preferredcodec": codec}]
+    if codec == "mp3":
+        postprocessors[0]["preferredquality"] = "320"
+
+    ydl_opts = ydl_base_opts(
+        format="bestaudio/best",
+        outtmpl=outtmpl,
+        postprocessors=postprocessors,
+        ffmpeg_location=FFMPEG_PATH,
+    )
+
     try:
-        if sys.platform == "win32":
-            os.startfile(DOWNLOADS_DIR)
-        elif sys.platform == "darwin":
-            subprocess.run(["open", DOWNLOADS_DIR])
-        else:
-            subprocess.run(["xdg-open", DOWNLOADS_DIR])
-        return {"status": "opened", "path": DOWNLOADS_DIR}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to open directory: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Download failed: {str(e)[:200]}")
 
-@app.get("/api/download-file/{filename}")
-def download_local_file(filename: str):
-    file_path = os.path.join(DOWNLOADS_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path, filename=filename)
+    title = sanitize_filename(info.get("title") or "audio")
+    filename = f"{title}.{codec}"
 
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+    produced = [
+        os.path.join(tmpdir, f)
+        for f in os.listdir(tmpdir)
+        if f.lower().endswith(f".{codec}")
+    ]
+    if not produced:
+        produced = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
+    if not produced:
+        raise HTTPException(status_code=500, detail="Conversion produced no file")
+
+    media_types = {
+        "mp3": "audio/mpeg",
+        "wav": "audio/wav",
+        "flac": "audio/flac",
+        "m4a": "audio/mp4",
+    }
+    return FileResponse(
+        produced[0],
+        filename=filename,
+        media_type=media_types.get(codec, "application/octet-stream"),
+    )
+
+
+def download_video(url: str, fmt: str):
+    height = {"mp4_720": 720, "mp4_1080": 1080}.get(fmt)
+    if height:
+        v_format = (
+            f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
+            f"bestvideo[height<={height}]+bestaudio/"
+            f"best[height<={height}]/best"
+        )
+    else:
+        v_format = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+
+    tmpdir = tempfile.mkdtemp(prefix="dlv_")
+    outtmpl = os.path.join(tmpdir, "%(title).80s.%(ext)s")
+
+    ydl_opts = ydl_base_opts(
+        format=v_format,
+        outtmpl=outtmpl,
+        merge_output_format="mp4",
+        ffmpeg_location=FFMPEG_PATH,
+    )
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Download failed: {str(e)[:200]}")
+
+    produced = [
+        os.path.join(tmpdir, f)
+        for f in os.listdir(tmpdir)
+        if f.lower().endswith((".mp4", ".mkv", ".webm", ".mov"))
+    ]
+    if not produced:
+        produced = [os.path.join(tmpdir, f) for f in os.listdir(tmpdir)]
+    if not produced:
+        raise HTTPException(status_code=500, detail="Download produced no file")
+
+    path = produced[0]
+    ext = os.path.splitext(path)[1].lstrip(".") or "mp4"
+    filename = f"{sanitize_filename(info.get('title') or 'video')}.{ext}"
+    media_types = {
+        "mp4": "video/mp4",
+        "mkv": "video/x-matroska",
+        "webm": "video/webm",
+        "mov": "video/quicktime",
+    }
+    return FileResponse(
+        path,
+        filename=filename,
+        media_type=media_types.get(ext, "application/octet-stream"),
+    )
+
 
 if __name__ == "__main__":
     import uvicorn
-    print("\n" + "="*50)
-    print(" 🚀 Cobalt-Style Universal Downloader")
-    print(" 👉 Open at: http://127.0.0.1:8000")
-    print("="*50 + "\n")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
