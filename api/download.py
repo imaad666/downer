@@ -1,10 +1,10 @@
 import os
 import sys
-import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import downloader
+from errors import DownloadError
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -26,22 +26,13 @@ def download(req: DownloadRequest):
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
 
-    mode = req.mode or "audio"
-    fmt = req.format or "mp3"
-
-    # Plain files: hand the URL straight to the browser.
-    if mode == "file" or downloader.is_direct_file(url):
-        name = downloader.sanitize_filename(
-            os.path.basename(urllib.parse.urlparse(url).path) or "download"
-        )
-        return JSONResponse({"kind": "redirect", "download_url": url, "filename": name})
-
     try:
-        if mode == "audio":
-            path, filename, media_type = downloader.download_audio(url, fmt)
-        else:
-            path, filename, media_type = downloader.download_video(url, fmt)
-    except RuntimeError as e:
+        result = downloader.download(url, req.mode, req.format)
+    except DownloadError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
+    if result[0] == "json":
+        return JSONResponse(result[1])
+
+    _, path, filename, media_type = result
     return FileResponse(path, filename=filename, media_type=media_type)
