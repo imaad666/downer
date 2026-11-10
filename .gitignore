@@ -18,3 +18,5 @@ Thumbs.db
 
 # Local downloads
 /downloads/
+.vercel
+.env*
