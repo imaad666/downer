@@ -1,0 +1,18 @@
+:root {
+  --bg: #ffffff;
+  --surface: #f5f6f8;
+  --surface-2: #eceef2;
+  --border: #e3e5ea;
+  --border-soft: #eceef2;
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-soft: rgba(0, 0, 0, 0.06);
+  --text: #0c0d12;
+  --muted: #5d6472;
+  --dim: #9aa0ae;
+  --ok: #1a9e6b;
+  --err: #d64550;
+  --radius: 16px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+}
