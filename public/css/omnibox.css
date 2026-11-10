@@ -1,0 +1,36 @@
+/* ---------- omnibox ---------- */
+.omnibox {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.omnibox:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.omnibox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 14px;
+}
+
+.omnibox-icon { color: var(--dim); flex-shrink: 0; }
+
+.omnibox-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.98rem;
+  padding: 10px 0;
+}
+.omnibox-input::placeholder { color: var(--dim); }
