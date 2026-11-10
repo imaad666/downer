@@ -1,0 +1,25 @@
+/* ---------- format pills ---------- */
+.formats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fmt-btn {
+  background: none;
+  border: 1px solid var(--border-soft);
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.fmt-btn:hover { color: var(--muted); border-color: var(--border); }
+.fmt-btn.active {
+  color: var(--text);
+  border-color: rgba(0, 0, 0, 0.45);
+  background: var(--surface-2);
+}
