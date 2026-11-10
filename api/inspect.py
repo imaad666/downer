@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import downloader
+import probe
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -20,4 +20,4 @@ def inspect(req: InspectRequest):
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
-    return downloader.inspect(url)
+    return probe.inspect(url)
