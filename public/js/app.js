@@ -336,6 +336,17 @@ function init() {
   document.querySelectorAll("#mode-seg .seg-btn").forEach((b) =>
     b.addEventListener("click", () => setMode(b.dataset.mode))
   );
+
+  // modal
+  const backdrop = $("modal-backdrop");
+  $("shortcut-btn").addEventListener("click", () => backdrop.classList.add("open"));
+  $("modal-close").addEventListener("click", () => backdrop.classList.remove("open"));
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) backdrop.classList.remove("open");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") backdrop.classList.remove("open");
+  });
 }
 
 init();
