@@ -1,4 +1,4 @@
-import { $ } from "./dom.js";
+import { setInspectProgress } from "./inspect.js";
 
 const ICONS = {
   working:
@@ -9,21 +9,9 @@ const ICONS = {
 
 let timer = null;
 
-function card(title, sub, icon, cls) {
-  $("progress-slot").innerHTML = `
-    <div class="progress-card ${cls}">
-      <div class="progress-top">
-        <div class="progress-icon">${icon}</div>
-        <div class="progress-title">${title}</div>
-      </div>
-      <div class="progress-sub">${sub}</div>
-      <div class="progress-bar"><div></div></div>
-    </div>`;
-}
-
 export function progressStart(title) {
   clearTimeout(timer);
-  card(title, "Resolving link…", ICONS.working, "");
+  setInspectProgress("Downloading…", ICONS.working, "active");
   const subs = [
     "Resolving link…",
     "Fetching media info…",
@@ -34,22 +22,17 @@ export function progressStart(title) {
   let i = 0;
   timer = setInterval(() => {
     i = (i + 1) % subs.length;
-    const sub = document.querySelector(".progress-sub");
-    if (sub) sub.textContent = subs[i];
+    const el = document.querySelector(".status");
+    if (el) el.textContent = subs[i];
   }, 2600);
 }
 
 export function progressDone(ok, title, sub) {
   clearTimeout(timer);
   timer = null;
-  card(
-    title,
-    sub,
-    ok ? ICONS.ok : ICONS.err,
-    ok ? "ok" : "err"
-  );
+  setInspectProgress(ok ? "Saved" : "Failed", ok ? ICONS.ok : ICONS.err, ok ? "ok" : "err");
   setTimeout(() => {
-    const el = document.querySelector(".progress-card");
+    const el = document.querySelector(".inspect");
     if (el) el.remove();
   }, ok ? 5000 : 8000);
 }

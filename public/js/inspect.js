@@ -15,9 +15,9 @@ export function renderInspect(data) {
   state.setInspected(data);
   const thumb = data.thumbnail || fallbackThumb(data.platform);
   $("inspect-slot").innerHTML = `
-    <div class="inspect">
+    <div class="inspect" id="inspect-card">
       <img class="inspect-thumb" src="${thumb}" alt="" loading="lazy" onerror="this.style.opacity=.25" />
-      <div style="min-width:0;flex:1">
+      <div style="min-width:0;flex:1" class="inspect-content">
         <div class="inspect-title">${esc(data.title)}</div>
         <div class="inspect-meta">
           <span class="platform-pill">${esc(data.platform || "Web")}</span>
@@ -31,4 +31,23 @@ export function renderInspect(data) {
 export function clearInspect() {
   $("inspect-slot").innerHTML = "";
   state.setInspected(null);
+}
+
+export function setInspectProgress(status, icon, cls) {
+  const card = document.getElementById("inspect-card");
+  if (!card) return;
+  card.className = `inspect ${cls}`;
+  const content = card.querySelector(".inspect-content");
+  content.innerHTML = `
+    <div class="inspect-progress">
+      <div class="status">${status}</div>
+      <div class="bar"><div></div></div>
+    </div>
+  `;
+  const thumb = card.querySelector(".inspect-thumb");
+  thumb.style.opacity = cls ? "0.5" : "1";
+  const iconDiv = document.createElement("div");
+  iconDiv.className = "status-icon";
+  iconDiv.innerHTML = icon;
+  card.insertBefore(iconDiv, content);
 }

@@ -1,4 +1,4 @@
-/* ---------- toasts, progress card, spinner ---------- */
+/* ---------- toasts ---------- */
 .toasts {
   position: fixed;
   bottom: 24px;
@@ -26,84 +26,6 @@
 .toast.err { border-color: rgba(220, 38, 38, 0.5); color: #fca5a5; }
 .toast.ok { border-color: rgba(22, 163, 74, 0.5); color: #86efac; }
 
-/* ---------- download progress card ---------- */
-.progress-card {
-  width: 100%;
-  margin-top: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow-card);
-  animation: rise 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.progress-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.progress-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  background: var(--accent-soft);
-  color: var(--text);
-}
-.progress-card.ok .progress-icon { background: var(--ok-soft); color: var(--ok); }
-.progress-card.err .progress-icon { background: var(--err-soft); color: var(--err); }
-
-.progress-title {
-  font-size: 0.85rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.progress-sub {
-  font-size: 0.74rem;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.progress-bar {
-  height: 4px;
-  border-radius: 3px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.progress-bar > div {
-  height: 100%;
-  width: 40%;
-  border-radius: 3px;
-  background: var(--accent);
-  animation: indeterminate 1.3s ease-in-out infinite;
-}
-.progress-card.ok .progress-bar > div {
-  width: 100%;
-  animation: none;
-  background: var(--ok);
-}
-.progress-card.err .progress-bar > div {
-  width: 100%;
-  animation: none;
-  background: var(--err);
-}
-
-@keyframes indeterminate {
-  0% { transform: translateX(-110%); }
-  100% { transform: translateX(280%); }
-}
-
 /* ---------- spinner ---------- */
 .spinner {
   width: 15px;
@@ -116,3 +38,4 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
