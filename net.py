@@ -32,6 +32,11 @@ def ydl_base_opts(**extra):
         "socket_timeout": 20,
         "retries": 8,
         "http_headers": {"User-Agent": UA},
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+            }
+        },
     }
     cookies = cookie_file()
     if cookies:
