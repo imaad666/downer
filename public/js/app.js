@@ -283,11 +283,17 @@ async function startDownload() {
   progressStart(shortTitle());
 
   try {
-    const res = await postJSON("/api/download", {
+    const body = JSON.stringify({
       url,
       mode: state.mode,
       format: state.format,
       title: state.inspected ? state.inspected.title : null,
+    });
+
+    const res = await fetch("/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
     });
 
     const ctype = res.headers.get("content-type") || "";
@@ -299,7 +305,30 @@ async function startDownload() {
         progressDone(true, "Download started", data.filename || "File sent to your browser");
       }
     } else if (res.ok) {
-      const blob = await res.blob();
+      // Read response body to track progress
+      const reader = res.body.getReader();
+      const contentLength = +res.headers.get("Content-Length");
+      let received = 0;
+      const chunks = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (contentLength) {
+          const pct = Math.min(100, Math.round((received / contentLength) * 100));
+          const el = document.querySelector(".status");
+          if (el) el.textContent = `Downloading… ${pct}%`;
+          const bar = document.querySelector(".bar > div");
+          if (bar) {
+            bar.style.width = pct + "%";
+            bar.style.animation = "none";
+          }
+        }
+      }
+
+      const blob = new Blob(chunks);
       const name = filenameFromDisposition(res.headers.get("content-disposition") || "");
       saveBlob(blob, name);
       progressDone(true, "Saved", name);

@@ -30,7 +30,7 @@ def ydl_base_opts(**extra):
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 20,
-        "retries": 8,
+        "retries": 12,
         "http_headers": {"User-Agent": UA},
         "extractor_args": {
             "youtube": {
@@ -38,6 +38,8 @@ def ydl_base_opts(**extra):
             }
         },
         "nocheckcertificate": True,
+        "ignoreerrors": True,
+        "fragment_retries": 10,
     }
     cookies = cookie_file()
     if cookies:
