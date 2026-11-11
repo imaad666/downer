@@ -33,12 +33,17 @@ def download_audio(url: str, fmt: str):
     postprocessors = [{"key": "FFmpegExtractAudio", "preferredcodec": codec}]
     if codec == "mp3":
         postprocessors[0]["preferredquality"] = "320"
+    # Embed cover art + tags where the container supports it (wav cannot).
+    if codec in ("mp3", "m4a", "flac"):
+        postprocessors.append({"key": "EmbedThumbnail"})
+        postprocessors.append({"key": "FFmpegMetadata"})
 
     ydl_opts = ydl_base_opts(
         format="bestaudio/best",
         outtmpl=outtmpl,
         postprocessors=postprocessors,
         ffmpeg_location=FFMPEG_PATH,
+        writethumbnail=True,
     )
 
     try:
