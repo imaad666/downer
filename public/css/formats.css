@@ -1,25 +1,26 @@
 /* ---------- format pills ---------- */
 .formats {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
 .fmt-btn {
   background: none;
-  border: 1px solid var(--border-soft);
+  border: 1px solid transparent;
   color: var(--dim);
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  padding: 5px 11px;
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.14s ease;
 }
-.fmt-btn:hover { color: var(--muted); border-color: var(--border); }
+.fmt-btn:hover { color: var(--muted); background: var(--surface-2); }
 .fmt-btn.active {
   color: var(--text);
-  border-color: rgba(0, 0, 0, 0.45);
-  background: var(--surface-2);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
 }
