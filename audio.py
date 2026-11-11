@@ -40,7 +40,7 @@ def download_audio(url: str, fmt: str):
         postprocessors.append({"key": "FFmpegMetadata"})
 
     ydl_opts = ydl_base_opts(
-        format="bestaudio/best",
+        format="bestaudio[ext=m4a]/bestaudio/best",
         outtmpl=outtmpl,
         postprocessors=postprocessors,
         ffmpeg_location=FFMPEG_PATH,
