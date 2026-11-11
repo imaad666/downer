@@ -34,9 +34,10 @@ def ydl_base_opts(**extra):
         "http_headers": {"User-Agent": UA},
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
+                "player_client": ["android", "ios", "web"],
             }
         },
+        "nocheckcertificate": True,
     }
     cookies = cookie_file()
     if cookies:
