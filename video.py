@@ -39,7 +39,9 @@ def download_video(url: str, fmt: str):
     tmpdir = tempfile.mkdtemp(prefix="dlv_")
     outtmpl = os.path.join(tmpdir, "%(title).80s.%(ext)s")
 
-    postprocessors = [{"key": "EmbedThumbnail"}, {"key": "FFmpegMetadata"}]
+    # NOTE: no EmbedThumbnail — embedding cover art into video containers
+    # requires ffprobe, which is not available in the serverless bundle.
+    postprocessors = [{"key": "FFmpegMetadata"}]
 
     ydl_opts = ydl_base_opts(
         format=_format_string(fmt),
