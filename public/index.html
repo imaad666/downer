@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>downer</title>
+<title>downer — paste a link, get the file</title>
 <meta name="description" content="Minimal media downloader. Paste a link from YouTube, SoundCloud, TikTok and more." />
-<meta name="theme-color" content="#ffffff" />
+<meta name="theme-color" content="#f4f4f6" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;750;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/css/vars.css" />
 <link rel="stylesheet" href="/css/base.css" />
 <link rel="stylesheet" href="/css/omnibox.css" />
@@ -20,9 +23,14 @@
 
 <header>
   <span class="brand-name">downer</span>
+  <span class="brand-sub">media downloader</span>
 </header>
 
 <main>
+  <div class="hero">
+    <h1>Paste a link. Get the file.</h1>
+  </div>
+
   <div class="omnibox">
     <div class="omnibox-row">
       <svg class="omnibox-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
@@ -44,18 +52,19 @@
         <svg id="go-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="4" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="20" x2="19" y2="20"/></svg>
       </button>
     </div>
-  </div>
 
-  <div class="options">
-    <div class="segmented" id="mode-seg" role="group" aria-label="Download mode">
-      <button class="seg-btn active" data-mode="audio">Audio</button>
-      <button class="seg-btn" data-mode="video">Video</button>
-      <button class="seg-btn" data-mode="file">File</button>
+    <div class="options-row">
+      <div class="segmented" id="mode-seg" role="group" aria-label="Download mode">
+        <button class="seg-btn active" data-mode="audio">Audio</button>
+        <button class="seg-btn" data-mode="video">Video</button>
+        <button class="seg-btn" data-mode="file">File</button>
+      </div>
+      <div class="formats" id="format-row"></div>
     </div>
-    <div class="formats" id="format-row"></div>
   </div>
 
   <div id="inspect-slot" style="width:100%"></div>
+  <div id="progress-slot" style="width:100%"></div>
 </main>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
