@@ -25,11 +25,12 @@ def _format_string(fmt: str) -> str:
     height = {"mp4_720": 720, "mp4_1080": 1080}.get(fmt)
     if height:
         return (
+            f"bestvideo[height<={height}][ext=mp4][vcodec!*=none]+bestaudio[ext=m4a]/"
             f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
             f"bestvideo[height<={height}]+bestaudio/"
             f"best[height<={height}]/best"
         )
-    return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+    return "bestvideo[ext=mp4][vcodec!*=none]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
 
 
 def download_video(url: str, fmt: str):
@@ -39,8 +40,6 @@ def download_video(url: str, fmt: str):
     tmpdir = tempfile.mkdtemp(prefix="dlv_")
     outtmpl = os.path.join(tmpdir, "%(title).80s.%(ext)s")
 
-    # NOTE: no EmbedThumbnail — embedding cover art into video containers
-    # requires ffprobe, which is not available in the serverless bundle.
     postprocessors = [{"key": "FFmpegMetadata"}]
 
     ydl_opts = ydl_base_opts(
@@ -49,7 +48,6 @@ def download_video(url: str, fmt: str):
         merge_output_format="mp4",
         postprocessors=postprocessors,
         ffmpeg_location=FFMPEG_PATH,
-        writethumbnail=True,
     )
 
     try:
