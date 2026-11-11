@@ -10,12 +10,24 @@ from net import UA, head_request, ydl_base_opts
 from platforms import detect_platform
 
 
+def _thumbnail(info, fallback=None):
+    thumb = info.get("thumbnail") or (fallback or {}).get("thumbnail")
+    if thumb:
+        return thumb
+    for source in (info, fallback or {}):
+        thumbs = source.get("thumbnails") or []
+        for th in reversed(thumbs):
+            if th.get("url"):
+                return th["url"]
+    return ""
+
+
 def _playlist_info(info):
     first = info["entries"][0] or {}
     return {
         "title": f"{info.get('title', 'Playlist')} ({len(info['entries'])} items)",
         "uploader": info.get("uploader") or first.get("uploader") or "",
-        "thumbnail": info.get("thumbnail") or first.get("thumbnail") or "",
+        "thumbnail": _thumbnail(info, first),
         "duration": info.get("duration") or first.get("duration") or 0,
     }
 
@@ -29,7 +41,7 @@ def _media_info(info):
             or info.get("channel")
             or ""
         ),
-        "thumbnail": info.get("thumbnail") or "",
+        "thumbnail": _thumbnail(info),
         "duration": info.get("duration") or 0,
     }
 
