@@ -3,6 +3,7 @@ import { GO_ICON_SVG } from "./config.js";
 import { state } from "./state.js";
 import { postJSON } from "./api.js";
 import { toast } from "./toast.js";
+import { progressStart, progressDone } from "./progress.js";
 
 export function setBusy(busy) {
   $("go-btn").disabled = busy;
@@ -35,6 +36,11 @@ function filenameFromDisposition(dispo) {
   return `${title || "download"}.${state.format === "raw" ? "" : state.format.split("_")[0]}`;
 }
 
+function shortTitle() {
+  const t = state.inspected && state.inspected.title;
+  return t ? t.slice(0, 42) + (t.length > 42 ? "…" : "") : "Download";
+}
+
 export async function startDownload() {
   const url = $("url-input").value.trim();
   if (!url) {
@@ -43,7 +49,7 @@ export async function startDownload() {
   }
 
   setBusy(true);
-  toast(state.mode === "audio" ? "Converting audio…" : "Preparing download…", "ok");
+  progressStart(shortTitle());
 
   try {
     const res = await postJSON("/api/download", {
@@ -59,20 +65,25 @@ export async function startDownload() {
       const data = await res.json();
       if (data.download_url) {
         clickDownload(data.download_url, data.filename);
-        toast("Download started", "ok");
+        progressDone(true, "Download started", data.filename || "File sent to your browser");
       }
     } else if (res.ok) {
       const blob = await res.blob();
-      saveBlob(blob, filenameFromDisposition(res.headers.get("content-disposition") || ""));
+      const name = filenameFromDisposition(res.headers.get("content-disposition") || "");
+      saveBlob(blob, name);
+      progressDone(true, "Saved", name);
       toast("Saved to your downloads", "ok");
     } else {
       let msg = "Download failed";
       try {
         msg = (await res.json()).detail || msg;
       } catch {}
-      toast(String(msg).slice(0, 140), "err");
+      msg = String(msg).slice(0, 140);
+      progressDone(false, "Download failed", msg);
+      toast(msg, "err");
     }
   } catch {
+    progressDone(false, "Network error", "Could not reach the server — try again");
     toast("Network error — try again", "err");
   } finally {
     setBusy(false);
