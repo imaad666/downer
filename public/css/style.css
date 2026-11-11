@@ -66,19 +66,6 @@ header {
   color: var(--dim);
 }
 
-.shortcut-btn {
-  background: none;
-  border: none;
-  color: var(--dim);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 8px;
-  transition: all 0.15s ease;
-  display: grid;
-  place-items: center;
-}
-.shortcut-btn:hover { color: var(--text); background: var(--surface-2); }
-
 /* ---------- main ---------- */
 main {
   flex: 1;
@@ -104,7 +91,24 @@ main {
   color: var(--text);
 }
 
-/* ---------- omnibox card ---------- */
+/* ---------- header icons ---------- */
+.shortcut-btn {
+  background: none;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  display: grid;
+  place-items: center;
+}
+.shortcut-btn:hover { color: var(--text); background: var(--surface-2); }
+
+.brand-logo {
+  color: var(--text);
+  flex-shrink: 0;
+}
 .omnibox {
   width: 100%;
   background: var(--surface);
