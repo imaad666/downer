@@ -1,10 +1,23 @@
 """HTTP helpers and yt-dlp option factory."""
 
 import os
+import tempfile
 import urllib.request
 import urllib.parse
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+
+def cookie_file():
+    """Write YTDLP_COOKIES env content to a temp cookies.txt, return its path."""
+    content = os.environ.get("YTDLP_COOKIES", "").strip()
+    if not content:
+        return None
+    path = os.path.join(tempfile.gettempdir(), "yt_dlp_cookies.txt")
+    if not os.path.exists(path):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content.replace("\\n", "\n"))
+    return path
 
 DIRECT_FILE_EXTS = (
     ".zip", ".rar", ".7z", ".tar", ".gz", ".pdf", ".iso",
@@ -20,6 +33,9 @@ def ydl_base_opts(**extra):
         "retries": 8,
         "http_headers": {"User-Agent": UA},
     }
+    cookies = cookie_file()
+    if cookies:
+        opts["cookiefile"] = cookies
     opts.update(extra)
     return opts
 
