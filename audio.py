@@ -1,6 +1,7 @@
 """Audio download + conversion via yt-dlp/ffmpeg."""
 
 import os
+import subprocess
 import tempfile
 
 import yt_dlp
@@ -53,7 +54,30 @@ def download_audio(url: str, fmt: str):
         raise DownloadError(f"Download failed: {str(e)[:200]}")
 
     filename = f"{sanitize_filename(info.get('title') or 'audio')}.{codec}"
-    return _pick_output(tmpdir, codec), filename, MEDIA_TYPES.get(codec, "application/octet-stream")
+    out = _pick_output(tmpdir, codec)
+
+    # Windows Explorer reads ID3v2.3 far more reliably than v2.4 — remux MP3s.
+    if codec == "mp3":
+        out = _remux_id3v23(out)
+
+    return out, filename, MEDIA_TYPES.get(codec, "application/octet-stream")
+
+
+def _remux_id3v23(path: str) -> str:
+    dst = path + ".v23.mp3"
+    try:
+        subprocess.run(
+            [
+                FFMPEG_PATH, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", path, "-map", "0", "-c", "copy", "-id3v2_version", "3", dst,
+            ],
+            check=True,
+            capture_output=True,
+        )
+        os.replace(dst, path)
+    except Exception:
+        pass  # keep the v2.4 file rather than fail the download
+    return path
 
 
 def _pick_output(tmpdir: str, ext: str):
