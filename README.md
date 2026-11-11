@@ -35,3 +35,22 @@ See `IOS_SHORTCUT.md` for share-sheet setup.
 - Video links are downloaded and merged server-side.
 - Direct file links (zip, pdf, mp3, …) are handed to the browser as-is.
 - Vercel functions have a max duration (~5 min on Hobby); very long videos may time out.
+
+## YouTube bot-check / cookies
+
+YouTube sometimes blocks datacenter IPs with
+`Sign in to confirm you're not a bot`. To fix it, give yt-dlp your browser
+cookies via a Vercel environment variable:
+
+1. Install a cookies export extension (e.g. "Get cookies.txt LOCALLY") in
+   Chrome/Firefox and export cookies for youtube.com.
+2. In Vercel → project **idowner** → Settings → Environment Variables, add:
+
+   | Name | Value |
+   | --- | --- |
+   | `YTDLP_COOKIES` | full contents of the exported `cookies.txt` |
+
+3. Redeploy (push any commit or run `vercel redeploy`).
+
+The app reads `YTDLP_COOKIES` at runtime and writes it to a temp file for
+yt-dlp. Never commit cookies to the repo.
