@@ -310,20 +310,26 @@ async function startDownload() {
       const contentLength = +res.headers.get("Content-Length");
       let received = 0;
       const chunks = [];
+      let lastUpdate = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
         received += value.length;
-        if (contentLength) {
-          const pct = Math.min(100, Math.round((received / contentLength) * 100));
-          const el = document.querySelector(".status");
-          if (el) el.textContent = `Downloading… ${pct}%`;
-          const bar = document.querySelector(".bar > div");
-          if (bar) {
-            bar.style.width = pct + "%";
-            bar.style.animation = "none";
+        const now = Date.now();
+        // Update UI every 100ms max
+        if (now - lastUpdate > 100) {
+          lastUpdate = now;
+          if (contentLength) {
+            const pct = Math.min(100, Math.round((received / contentLength) * 100));
+            const el = document.querySelector(".status");
+            if (el) el.textContent = `Downloading… ${pct}%`;
+            const bar = document.querySelector(".bar > div");
+            if (bar) {
+              bar.style.width = pct + "%";
+              bar.style.animation = "none";
+            }
           }
         }
       }

@@ -35,4 +35,14 @@ def download(req: DownloadRequest):
         return JSONResponse(result[1])
 
     _, path, filename, media_type = result
-    return FileResponse(path, filename=filename, media_type=media_type)
+    import os
+    file_size = os.path.getsize(path)
+    return FileResponse(
+        path,
+        filename=filename,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(file_size),
+        },
+    )

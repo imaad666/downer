@@ -14,9 +14,9 @@ def cookie_file():
     if not content:
         return None
     path = os.path.join(tempfile.gettempdir(), "yt_dlp_cookies.txt")
-    if not os.path.exists(path):
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content.replace("\\n", "\n"))
+    # Always rewrite to pick up env changes
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content.replace("\\n", "\n"))
     return path
 
 DIRECT_FILE_EXTS = (
