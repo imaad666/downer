@@ -10,13 +10,20 @@ UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 
 def cookie_file():
     """Write YTDLP_COOKIES env content to a temp cookies.txt, return its path."""
+    import base64
     content = os.environ.get("YTDLP_COOKIES", "").strip()
     if not content:
         return None
+    # Try base64 decode first (for env var compatibility)
+    try:
+        content = base64.b64decode(content).decode("utf-8")
+    except:
+        pass  # not base64, use as-is
+    # Replace \n escapes with actual newlines
+    content = content.replace("\\n", "\n")
     path = os.path.join(tempfile.gettempdir(), "yt_dlp_cookies.txt")
-    # Always rewrite to pick up env changes
     with open(path, "w", encoding="utf-8") as f:
-        f.write(content.replace("\\n", "\n"))
+        f.write(content)
     return path
 
 DIRECT_FILE_EXTS = (
