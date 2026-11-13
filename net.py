@@ -1,5 +1,6 @@
 """HTTP helpers and yt-dlp option factory."""
 
+import base64
 import os
 import tempfile
 import urllib.request
@@ -7,29 +8,66 @@ import urllib.parse
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-
-def cookie_file():
-    """Write YTDLP_COOKIES env content to a temp cookies.txt, return its path."""
-    import base64
-    content = os.environ.get("YTDLP_COOKIES", "").strip()
-    if not content:
-        return None
-    # Try base64 decode first (for env var compatibility)
-    try:
-        content = base64.b64decode(content).decode("utf-8")
-    except:
-        pass  # not base64, use as-is
-    # Replace \n escapes with actual newlines
-    content = content.replace("\\n", "\n")
-    path = os.path.join(tempfile.gettempdir(), "yt_dlp_cookies.txt")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return path
-
 DIRECT_FILE_EXTS = (
     ".zip", ".rar", ".7z", ".tar", ".gz", ".pdf", ".iso",
     ".exe", ".dmg", ".apk", ".mp3", ".mp4", ".wav", ".flac",
 )
+
+
+def _looks_like_netscape_cookies(content: str) -> bool:
+    """True when content has a Netscape header or at least one 7-field cookie line."""
+    has_entry = False
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            lowered = line.lower()
+            if "netscape" in lowered or "http cookie file" in lowered:
+                return True
+            continue
+        # Netscape cookie lines are 7 tab-separated fields.
+        if line.count("\t") >= 6:
+            parts = line.split("\t")
+            if len(parts) >= 7 and parts[0]:
+                has_entry = True
+    return has_entry
+
+
+def _decode_cookie_env(content: str) -> str:
+    """Decode YTDLP_COOKIES, accepting plain text or base64."""
+    content = content.strip()
+    if _looks_like_netscape_cookies(content.replace("\\n", "\n")):
+        return content.replace("\\n", "\n")
+
+    # Only attempt base64 when the value does not already look like cookies.
+    try:
+        decoded = base64.b64decode(content, validate=True).decode("utf-8")
+        return decoded.replace("\\n", "\n")
+    except Exception:
+        return content.replace("\\n", "\n")
+
+
+def cookie_file():
+    """Write YTDLP_COOKIES env content to a temp cookies.txt, return its path.
+
+    Returns None when unset or when the value is not a valid Netscape cookies file,
+    so a bad Vercel env var cannot break every download.
+    """
+    raw = os.environ.get("YTDLP_COOKIES", "").strip()
+    if not raw:
+        return None
+
+    content = _decode_cookie_env(raw)
+    if not _looks_like_netscape_cookies(content):
+        return None
+
+    path = os.path.join(tempfile.gettempdir(), "yt_dlp_cookies.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+        if not content.endswith("\n"):
+            f.write("\n")
+    return path
 
 
 def ydl_base_opts(**extra):
@@ -39,9 +77,11 @@ def ydl_base_opts(**extra):
         "socket_timeout": 20,
         "retries": 8,
         "http_headers": {"User-Agent": UA},
+        # android alone is format-starved / PO-token heavy; android_vr works
+        # without cookies for most public videos. Keep android as fallback.
         "extractor_args": {
             "youtube": {
-                "player_client": ["android"],
+                "player_client": ["android_vr", "android"],
             }
         },
     }
