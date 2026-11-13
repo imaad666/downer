@@ -77,17 +77,25 @@ def ydl_base_opts(**extra):
         "socket_timeout": 20,
         "retries": 8,
         "http_headers": {"User-Agent": UA},
-        # android alone is format-starved / PO-token heavy; android_vr works
-        # without cookies for most public videos. Keep android as fallback.
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android_vr", "android"],
-            }
-        },
     }
     cookies = cookie_file()
     if cookies:
+        # Cookie-capable clients. Android clients ignore account cookies.
         opts["cookiefile"] = cookies
+        opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["web", "web_safari", "tv"],
+            }
+        }
+    else:
+        # Datacenter IPs often fail the webpage bot-check; skip it and use
+        # innertube clients that still serve public formats without cookies.
+        opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["android_vr", "android"],
+                "player_skip": ["webpage", "configs"],
+            }
+        }
     opts.update(extra)
     return opts
 

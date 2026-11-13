@@ -20,4 +20,7 @@ def inspect(req: InspectRequest):
     url = req.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
-    return probe.inspect(url)
+    try:
+        return probe.inspect(url)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e)[:300])

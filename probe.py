@@ -61,6 +61,7 @@ def _payload(url, platform, meta, type_):
 
 def inspect(url: str) -> dict:
     platform = detect_platform(url)
+    extract_error = None
 
     try:
         with yt_dlp.YoutubeDL(ydl_base_opts()) as ydl:
@@ -68,7 +69,12 @@ def inspect(url: str) -> dict:
 
         meta = _playlist_info(info) if info.get("entries") else _media_info(info)
         return _payload(url, platform, meta, "media")
-    except Exception:
+    except Exception as e:
+        extract_error = str(e)
+        # Known media sites: surface the real extractor failure instead of
+        # mislabeling the watch page as a direct file via HEAD.
+        if platform not in ("Direct / Web",):
+            raise RuntimeError(extract_error[:300]) from e
         # Direct file or unsupported page — do a lightweight HEAD probe.
         try:
             with head_request(url) as resp:
